@@ -9,6 +9,7 @@ from backend.schemas.resume import (
     ResumeUploadResponse, ResumeProcessingResponse, ResumeResponse,
     ResumeListResponse, ResumeSearchRequest, ResumeSearchResponse, CandidateMatch
 )
+from backend.schemas.chat import ChatMessageRequest, ChatMessageResponse
 from backend.services.minio_service import minio_service
 from backend.services.resume_parser import resume_parser
 from backend.services.openai_service import openai_service
@@ -303,6 +304,32 @@ async def search_resumes(
         )
 
 
+@router.post("/chat")
+async def chat_with_assistant(
+    chat_request: ChatMessageRequest,
+    current_user: dict = Depends(get_current_user_jwt),
+    db: Session = Depends(get_db)
+):
+    """Chat with OpenAI Assistant for intelligent resume search"""
+    try:
+        # Use OpenAI Assistant to search through resumes
+        assistant_result = openai_service.search_with_assistant(chat_request.message)
+        
+        return {
+            "message": chat_request.message,
+            "response": assistant_result["response"],
+            "thread_id": assistant_result["thread_id"],
+            "status": assistant_result["status"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in chat with assistant: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing chat request: {str(e)}"
+        )
+
+
 async def process_resume(resume_id: int, db: Session):
     """Process a resume (parse, extract metadata, create embeddings)"""
     try:
@@ -362,6 +389,14 @@ async def process_resume(resume_id: int, db: Session):
                     resume.is_indexed = True
                 except Exception as e:
                     logger.warning(f"Could not create embeddings: {e}")
+                
+                # Upload to OpenAI Vector Store
+                try:
+                    file_id = openai_service.upload_file_to_vector_store(temp_file_path, resume.original_filename)
+                    logger.info(f"Resume {resume.id} uploaded to vector store with file_id: {file_id}")
+                    resume.openai_file_id = file_id
+                except Exception as e:
+                    logger.warning(f"Could not upload to vector store: {e}")
                 
                 db.commit()
                 

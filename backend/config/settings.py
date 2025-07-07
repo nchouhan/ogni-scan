@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     openai_api_key: str = ""
     openai_assistant_id: str = ""
+    openai_vector_store_id: str = ""
     
     # JWT Configuration
     jwt_secret_key: str = "your_jwt_secret_key_here"

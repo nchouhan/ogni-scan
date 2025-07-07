@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Send, User, Bot, Loader2 } from 'lucide-react'
 import { cn, formatDate } from '../lib/utils'
+import { resumeAPI } from '../lib/api'
 
 interface Message {
   id: string
@@ -19,7 +20,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     {
       id: '1',
       type: 'assistant',
-      content: "Hello! I'm CogniScan, your AI resume assistant. I can help you analyze resumes, search for candidates, and provide insights. What would you like to do today?",
+      content: "👋 **Welcome to CogniScan!**\n\nI'm your AI resume assistant. I can help you:\n\n🔍 **Search candidates** - Try: 'Find Supriya' or 'Search Python developers'\n📄 **Analyze resumes** - Extract skills, experience, and qualifications\n📊 **Get insights** - Compare candidates and identify top skills\n\n**Quick start:**\n1. Upload resumes using the 'Upload Resumes' tab\n2. Ask me to search: 'Find candidates named [name]'\n3. Or search by skills: 'Who knows React?'\n\nWhat would you like to search for?",
       timestamp: new Date()
     }
   ])
@@ -46,6 +47,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     }
 
     setMessages(prev => [...prev, userMessage])
+    const userInput = input
     setInput('')
     setIsLoading(true)
 
@@ -61,8 +63,8 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     setMessages(prev => [...prev, loadingMessage])
 
     try {
-      // Simulate AI response based on user input
-      const response = await generateAIResponse(input)
+      // Generate AI response based on user input with actual backend calls
+      const response = await generateAIResponse(userInput)
       setMessages(prev => prev.filter(msg => !msg.isLoading).concat({
         id: (Date.now() + 2).toString(),
         type: 'assistant',
@@ -70,10 +72,11 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
         timestamp: new Date()
       }))
     } catch (error) {
+      console.error('Error generating response:', error)
       setMessages(prev => prev.filter(msg => !msg.isLoading).concat({
         id: (Date.now() + 2).toString(),
         type: 'assistant',
-        content: "I'm sorry, I encountered an error. Please try again.",
+        content: "I'm sorry, I encountered an error while searching. Please try again.",
         timestamp: new Date()
       }))
     } finally {
@@ -82,8 +85,34 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
   }
 
   const generateAIResponse = async (userInput: string): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    return "I understand you're asking about: " + userInput + ". I can help you with resume analysis, candidate search, and insights. Could you be more specific about what you'd like to know?"
+    try {
+      // Use OpenAI Assistant for all queries
+      const chatResult = await resumeAPI.chat(userInput)
+      
+      if (chatResult.status === 'completed' && chatResult.response) {
+        return chatResult.response
+      } else {
+        return "I'm having trouble processing your request right now. Please try again or rephrase your question."
+      }
+      
+    } catch (error: any) {
+      console.error('Error in generateAIResponse:', error)
+      
+      // Handle specific error cases
+      if (error.response?.status === 401) {
+        return `🔒 **Authentication Required**\n\nYou need to be logged in to search resumes. Please:\n1. Make sure you're logged in as admin\n2. Check if your session has expired\n3. Try refreshing the page\n\nIf you're still having issues, please log in again.`
+      }
+      
+      if (error.response?.status === 404) {
+        return `📂 **No Resumes Found**\n\nIt looks like no resumes have been uploaded yet. To get started:\n1. Go to the "Upload Resumes" tab\n2. Upload some PDF, DOCX, or TXT resume files\n3. Wait for them to be processed\n4. Then come back and search!\n\nOnce you have resumes uploaded, I'll be able to search through them for you.`
+      }
+      
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
+        return `🔌 **Backend Connection Issue**\n\nI can't connect to the CogniScan backend service. Please:\n1. Make sure the backend server is running\n2. Check if it's accessible at http://localhost:8000\n3. Verify your network connection\n\nIf you're a developer, run the backend with: \`python3 -m uvicorn backend.main:app --reload\``
+      }
+      
+      return `❌ **Unexpected Error**\n\nI encountered an error while processing your request:\n\n**Error:** ${error.message || 'Unknown error'}\n\nPlease try:\n• Refreshing the page\n• Rephrasing your question\n• Checking your internet connection\n• Verifying the backend service is running`
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -121,7 +150,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
               {message.isLoading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Thinking...</span>
+                  <span>Searching through resumes...</span>
                 </div>
               ) : (
                 <div className="whitespace-pre-wrap">{message.content}</div>
@@ -148,7 +177,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask me about resumes, candidates, or upload files..."
+            placeholder="Ask me about candidates: 'Find Supriya', 'Search Python developers', 'Who has React experience?'"
             className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow"
             rows={1}
             disabled={isLoading}

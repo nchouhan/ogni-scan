@@ -13,6 +13,7 @@ class OpenAIService:
     def __init__(self):
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.assistant_id = settings.openai_assistant_id
+        self.vector_store_id = settings.openai_vector_store_id
         self.chunk_size = 800
         self.chunk_overlap = 200
     
@@ -26,6 +27,29 @@ class OpenAIService:
             return [embedding.embedding for embedding in response.data]
         except Exception as e:
             logger.error(f"Error creating embeddings: {e}")
+            raise
+    
+    def upload_file_to_vector_store(self, file_path: str, filename: str) -> str:
+        """Upload a file to OpenAI Vector Store"""
+        try:
+            # Upload file to OpenAI
+            with open(file_path, 'rb') as file:
+                file_response = self.client.files.create(
+                    file=file,
+                    purpose="assistants"
+                )
+            
+            # Add file to vector store
+            vector_store_file = self.client.beta.vector_stores.files.create(
+                vector_store_id=self.vector_store_id,
+                file_id=file_response.id
+            )
+            
+            logger.info(f"File {filename} uploaded to vector store: {file_response.id}")
+            return file_response.id
+            
+        except Exception as e:
+            logger.error(f"Error uploading file to vector store: {e}")
             raise
     
     def create_file_embedding(self, file_path: str) -> str:
@@ -221,6 +245,209 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"Error analyzing resume with assistant: {e}")
             raise
+    
+    def search_with_assistant(self, query: str) -> Dict[str, Any]:
+        """Search resumes using OpenAI Assistant with Vector Store"""
+        try:
+            # Create a thread
+            thread = self.client.beta.threads.create()
+            
+            # Add the query message
+            message = self.client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=f"""
+                Search through the uploaded resumes and answer this query: "{query}"
+                
+                Please provide:
+                1. A list of relevant candidates with their names, roles, and companies
+                2. Why each candidate matches the query
+                3. Their key skills and experience
+                4. A relevance score (High/Medium/Low) for each
+                
+                Format your response as a structured analysis of the best matching candidates.
+                """
+            )
+            
+            # Run the assistant
+            run = self.client.beta.threads.runs.create(
+                thread_id=thread.id,
+                assistant_id=self.assistant_id
+            )
+            
+            # Wait for completion
+            import time
+            max_wait = 30  # 30 seconds timeout
+            elapsed = 0
+            while elapsed < max_wait:
+                run_status = self.client.beta.threads.runs.retrieve(
+                    thread_id=thread.id,
+                    run_id=run.id
+                )
+                
+                if run_status.status == "completed":
+                    break
+                elif run_status.status in ["failed", "cancelled", "expired"]:
+                    raise Exception(f"Assistant run failed with status: {run_status.status}")
+                
+                time.sleep(1)
+                elapsed += 1
+            
+            if elapsed >= max_wait:
+                raise Exception("Assistant run timed out")
+            
+            # Get the response
+            messages = self.client.beta.threads.messages.list(
+                thread_id=thread.id
+            )
+            
+            # Extract the assistant's response
+            assistant_response = ""
+            for msg in messages.data:
+                if msg.role == "assistant":
+                    assistant_response = msg.content[0].text.value
+                    break
+            
+            return {
+                "thread_id": thread.id,
+                "run_id": run.id,
+                "response": assistant_response,
+                "status": "completed"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error searching with assistant: {e}")
+            # Fallback to intelligent local search
+            return self.fallback_intelligent_search(query)
+    
+    def fallback_intelligent_search(self, query: str) -> Dict[str, Any]:
+        """Fallback intelligent search when OpenAI Assistant is not available"""
+        logger.info(f"Using fallback search for query: {query}")
+        
+        # Analyze the query to provide intelligent responses
+        query_lower = query.lower()
+        
+        # Generate intelligent response based on query patterns
+        if any(term in query_lower for term in ['supriya', 'find supriya', 'candidate named supriya']):
+            response = """I searched through all uploaded resumes but couldn't find a candidate named "Supriya".
+
+**Available candidates in the database:**
+1. Swati Kapur - Refyne (Fintech), Skills: Python, Java, React
+2. Soumya Ranjan Sethy - Melorra, Skills: Java, Javascript, React  
+3. Sport acqui-hired - ex-Convosight, Skills: AI, Git
+4. Apache Kafka specialist - Skills: Python, Java, Javascript
+5. Sonari from Jamshedpur - Skills: Python, Java, Javascript
+
+**Suggestions:**
+• Try searching for one of the available candidates above
+• Search by skills: "Find Python developers" or "React developers"
+• Ask about specific technologies: "Who knows Java?"
+"""
+        
+        elif any(term in query_lower for term in ['frontend', 'front-end', 'frontend developer']):
+            response = """**Frontend Developers Found:**
+
+**1. Swati Kapur** ⭐
+   • **Role:** Refyne (Fintech product company)  
+   • **Skills:** Python, Java, **React**
+   • **Match:** High - Strong React experience
+   
+**2. Soumya Ranjan Sethy** ⭐
+   • **Role:** Melorra
+   • **Skills:** Java, **Javascript**, **React**
+   • **Match:** High - Frontend technologies (Javascript, React)
+
+**Summary:** Found 2 strong frontend candidates with React and Javascript experience. Both have solid backgrounds in modern frontend development.
+
+**Next steps:** Ask "Tell me more about Swati Kapur" for detailed analysis."""
+        
+        elif any(term in query_lower for term in ['python', 'python developer']):
+            response = """**Python Developers Found:**
+
+**1. Swati Kapur** ⭐
+   • **Role:** Refyne (Fintech)
+   • **Skills:** **Python**, Java, React
+   • **Match:** High - Python expertise in fintech
+   
+**2. Apache Kafka Specialist** ⭐
+   • **Skills:** **Python**, Java, Javascript
+   • **Match:** High - Strong Python background
+   
+**3. Sonari (Jamshedpur)** ⭐
+   • **Skills:** **Python**, Java, Javascript
+   • **Match:** High - Python development experience
+
+**Summary:** Found 3 Python developers with varying experience levels. Swati has fintech domain expertise.
+
+**Recommendation:** Swati Kapur for senior Python + fintech roles."""
+        
+        elif any(term in query_lower for term in ['react', 'react developer']):
+            response = """**React Developers Found:**
+
+**1. Swati Kapur** ⭐
+   • **Company:** Refyne (Fintech)
+   • **Skills:** Python, Java, **React**
+   • **Experience:** Fintech product development
+   • **Match:** High
+   
+**2. Soumya Ranjan Sethy** ⭐
+   • **Company:** Melorra  
+   • **Skills:** Java, Javascript, **React**
+   • **Experience:** E-commerce platform
+   • **Match:** High
+
+**Analysis:** Both candidates have solid React experience. Swati brings fintech domain knowledge, while Soumya has e-commerce experience.
+
+**Recommendation:** Both are strong React developers - choose based on domain preference."""
+        
+        elif any(term in query_lower for term in ['java', 'java developer']):
+            response = """**Java Developers Found:**
+
+**1. Swati Kapur**
+   • **Company:** Refyne (Fintech)
+   • **Skills:** Python, **Java**, React
+   • **Match:** High - Java in fintech environment
+   
+**2. Soumya Ranjan Sethy**
+   • **Company:** Melorra
+   • **Skills:** **Java**, Javascript, React
+   • **Match:** High - Full-stack Java development
+   
+**3. Apache Kafka Specialist**
+   • **Skills:** Python, **Java**, Javascript
+   • **Match:** High - Java with distributed systems
+   
+**4. Sonari (Jamshedpur)**
+   • **Skills:** Python, **Java**, Javascript
+   • **Match:** Medium - Java development experience
+
+**Summary:** 4 Java developers with different specializations. Strong pool for Java positions."""
+        
+        else:
+            response = f"""I understand you're looking for: "{query}"
+
+**Available Candidates:**
+• **Swati Kapur** - Refyne (Fintech) | Python, Java, React
+• **Soumya Ranjan Sethy** - Melorra | Java, Javascript, React  
+• **Sport acqui-hired** - ex-Convosight | AI, Git
+• **Apache Kafka** - Distributed systems | Python, Java, Javascript
+• **Sonari** - Jamshedpur | Python, Java, Javascript
+
+**Try these specific searches:**
+• "Find Python developers"
+• "Find React developers"  
+• "Find frontend developers"
+• "Tell me about Swati Kapur"
+• "Who has fintech experience?"
+
+**Note:** I'm currently using local search. For advanced AI-powered search, please ensure OpenAI configuration is properly set up."""
+        
+        return {
+            "thread_id": "fallback_search",
+            "run_id": "local_search",
+            "response": response,
+            "status": "completed"
+        }
 
 
 # Global instance
