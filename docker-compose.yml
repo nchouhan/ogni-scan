@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cogni_postgres
+    environment:
+      POSTGRES_DB: cogni_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5442:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cogni_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage - Using existing instance
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: cogni_minio
+  #   environment:
+  #     MINIO_ROOT_USER: COGNIACCESS
+  #     MINIO_ROOT_PASSWORD: COGNISECRET
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   volumes:
+  #     - minio_data:/data
+  #   command: server /data --console-address ":9001"
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     timeout: 20s
+  #     retries: 3
+
+  # CogniScan Backend
+  backend:
+    build: .
+    container_name: cogni_backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cogni_db
+      - MINIO_ENDPOINT=host.docker.internal:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+      - MINIO_SECURE=${MINIO_SECURE}
+      - REDIS_URL=redis://host.docker.internal:6379/10
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - JWT_SECRET_KEY=your_jwt_secret_key_here_change_in_production
+      - DEBUG=true
+      - ALLOWED_EXTENSIONS=["pdf", "docx", "txt"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./alembic:/app/alembic
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 10 &&
+        uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  # CogniScan Frontend (placeholder for now)
+  frontend:
+    image: nginx:alpine
+    container_name: cogni_frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data: 

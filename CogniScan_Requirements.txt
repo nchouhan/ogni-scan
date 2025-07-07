@@ -1,0 +1,162 @@
+**Project Title**: Resume Insight Assistant Platform
+
+**Objective**:
+Build a GPT-like intelligent assistant platform that allows recruiters to query and understand candidate resumes naturally and smartly. The system should support semantic search, summarization, justifications, tool usage, and structured output through a responsive frontend. System should handle a growing corpus of resumes.
+
+---
+
+## PART 1: SYSTEM OVERVIEW
+
+### Core Capabilities:
+
+* Upload, parse, and process resumes (PDF, DOCX, etc.)
+* Extract structured metadata (skills, roles, experience, etc.)
+* Chunk resumes and store embeddings in vector store
+* Recruiters can query system in natural language
+* System retrieves and summarizes relevant candidates with justifications
+* Output presented as chat + card interface with structured comparisons
+
+### Tech Philosophy:
+
+* Use **OpenAI Assistants API + Vector Store** as foundation
+* Use **external tools** where OpenAI does not provide capability
+* Keep frontend lightweight and intuitive for recruiter workflows
+
+---
+
+## PART 2: PIPELINE REQUIREMENTS
+
+### 1. Resume Ingestion Pipeline
+
+#### a. Upload & Storage:
+
+* Accept resumes via API or UI
+* Supported formats: PDF, DOCX, TXT
+* Store in **AWS S3**
+* Trigger parsing job post-upload
+
+#### b. Resume Parsing:
+
+* Use **Unstructured.io** or `pdfminer.six` for text extraction
+* Use **Textract** for scanned resumes (OCR)
+* Normalize spacing, remove artifacts using Python
+
+#### c. Metadata Extraction:
+
+* Extract:
+
+  * Name, email, phone
+  * Roles, companies, skills, durations
+  * Domain classification (fintech, SaaS, etc.)
+* Use `spaCy` + GPT-4 fallback
+
+#### d. Chunking:
+
+* Use `RecursiveCharacterTextSplitter` or `LangChain` splitter
+* Target chunk size: \~500-800 tokens
+* Store chunk-to-resume mapping
+
+#### e. Embedding:
+
+* Use **OpenAI `text-embedding-3-large`**
+* Vectorize each chunk
+
+#### f. Indexing:
+
+* Store embeddings in **OpenAI Vector Store API**
+* Store extracted metadata in **PostgreSQL**
+
+
+---
+
+### 2. Retrieval-to-Answer Pipeline
+
+#### a. Recruiter Query Input:
+
+* Chat-style input via React UI
+
+#### b. Query Understanding:
+
+* Use **OpenAI Assistants API**
+* Extract structured filters (e.g. skills, domains, experience) via prompt/function-calling
+
+#### c. Semantic Retrieval:
+
+* Use Assistant + Vector Store to search relevant chunks
+
+#### d. Metadata Filtering:
+
+* Apply filters manually via tool calling (e.g., domain, years exp)
+* Function exposed from backend (FastAPI)
+
+#### e. Answer Generation (RAG):
+
+* Use **Assistant’s built-in RAG capability**
+* Provide candidate chunks as context
+* GPT answers with:
+
+  * Natural language summary
+  * Bullet-pointed justifications
+  * Candidate rankings (optional)
+
+#### f. Tool Calling (Optional):
+
+* Allow GPT to call backend tools for things like:
+
+  * “Filter candidates by fintech + Python + 5+ years exp”
+  * “Get candidates available in Mumbai”
+
+---
+
+## PART 3: FRONTEND REQUIREMENTS
+
+### a. Recruiter Chat Interface:
+
+* Built in **React + Tailwind + shadcn/ui**
+* Left side: Chat input/output
+* Right side: Candidate result cards or comparison grid
+
+### b. Candidate Card View:
+
+* Name, Role, Skills Match %
+* Snippet of justification (from resume)
+* “Why this candidate?” expandable view
+* Optional CTA: View full resume, shortlist, reject
+
+### c. Candidate Compare View:
+
+* Side-by-side 2–3 candidate comparison
+* Columns: Skills, Experience, Domain, Education, Highlights
+
+---
+
+## PART 4: TOOLING / LIBRARIES
+
+| Purpose             | Tool                            |
+| ------------------- | ------------------------------- |
+| Resume Parsing      | Unstructured.io, Textract       |
+| Metadata Extraction | spaCy + GPT-4                   |
+| Chunking            | LangChain splitter              |
+| Embedding           | OpenAI `text-embedding-3-large` |
+| Vector Search       | OpenAI Vector Store             |
+| Metadata DB         | PostgreSQL                      |
+| API Framework       | FastAPI                         |
+| Scheduler           | Airflow or Celery               |
+| LLM Agent           | OpenAI Assistants API           |
+| UI Framework        | React + Tailwind + shadcn/ui    |
+
+---
+
+## PART 5: DEPLOYMENT + SECURITY
+
+* All resume uploads and parsing should happen in a in local minio db - (localhost:9000 : bucket name recruitment-files)
+* OpenAI file uploads should be done server-side to preserve API key privacy
+* User queries and Assistant results should be logged (with opt-out support)
+* Protect API endpoints via JWT-based auth for recruiter logins, recruiter should login with dummy username : admin and password: admin we will change this later
+
+---
+Insure API of this system can be called by other system using simple auth username : admin password : admin for both resume Ingestion and query
+
+
+have properties file where we can setup things like host port for various service, api path etc , internal system, choices 
+.env strictly keep credentials only and anything which is very secrete, dummy cred, OPENAI_API_KEY etc
