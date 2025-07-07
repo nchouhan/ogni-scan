@@ -11,14 +11,22 @@ logger = logging.getLogger(__name__)
 
 class MinIOService:
     def __init__(self):
-        self.client = Minio(
-            settings.minio_endpoint,
-            access_key=settings.minio_access_key,
-            secret_key=settings.minio_secret_key,
-            secure=settings.minio_secure
-        )
-        self.bucket_name = settings.minio_bucket_name
-        self._ensure_bucket_exists()
+        try:
+            self.client = Minio(
+                settings.minio_endpoint,
+                access_key=settings.minio_access_key,
+                secret_key=settings.minio_secret_key,
+                secure=settings.minio_secure
+            )
+            self.bucket_name = settings.minio_bucket_name
+            self._ensure_bucket_exists()
+            self.available = True
+            logger.info("MinIO service initialized successfully")
+        except Exception as e:
+            logger.error(f"MinIO service initialization failed: {e}")
+            self.client = None
+            self.bucket_name = settings.minio_bucket_name
+            self.available = False
     
     def _ensure_bucket_exists(self):
         """Ensure the bucket exists, create if it doesn't"""
@@ -28,13 +36,17 @@ class MinIOService:
                 logger.info(f"Created bucket: {self.bucket_name}")
             else:
                 logger.info(f"Bucket {self.bucket_name} already exists")
-        except S3Error as e:
+        except Exception as e:
             logger.error(f"Error ensuring bucket exists: {e}")
             # Don't raise the error to allow the application to start
             # The bucket check will be retried when needed
     
     def upload_file(self, file_data: BinaryIO, filename: str, content_type: str = "application/octet-stream") -> str:
         """Upload a file to MinIO and return the file path"""
+        if not self.available:
+            logger.error("MinIO service not available")
+            raise Exception("MinIO service not available")
+            
         try:
             # Generate unique filename
             file_extension = os.path.splitext(filename)[1]

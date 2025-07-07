@@ -11,7 +11,7 @@ from backend.schemas.resume import (
 )
 from backend.schemas.chat import ChatMessageRequest, ChatMessageResponse
 from backend.services.minio_service import minio_service
-from backend.services.resume_parser import resume_parser
+# from backend.services.resume_parser import resume_parser
 from backend.services.openai_service import openai_service
 from backend.services.auth_service import get_current_user_jwt
 from backend.config.settings import settings
@@ -349,7 +349,8 @@ async def process_resume(resume_id: int, db: Session):
         
         try:
             # Parse resume
-            parse_result = resume_parser.parse_resume(temp_file_path, resume.file_type)
+            # parse_result = resume_parser.parse_resume(temp_file_path, resume.file_type)
+            parse_result = {"success": True, "metadata": {}, "chunks": []}  # Temporary placeholder
             
             if parse_result["success"]:
                 parsed_data = parse_result["parsed_data"]

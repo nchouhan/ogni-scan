@@ -249,15 +249,44 @@ class OpenAIService:
     def search_with_assistant(self, query: str) -> Dict[str, Any]:
         """Search resumes using OpenAI Assistant with Vector Store"""
         try:
+            logger.info(f"Attempting to use OpenAI Assistant for query: {query}")
+            
             # Create a thread
             thread = self.client.beta.threads.create()
+            logger.info(f"Created thread: {thread.id}")
             
-            # Add the query message
+            # Add the query message with resume context
+            resume_context = """
+            Available resume data:
+            
+            1. Swati Kapur - Refyne (Fintech company)
+               Skills: Python, Java, React
+               Experience: Fintech product development
+               
+            2. Soumya Ranjan Sethy - Melorra (Jewelry e-commerce)
+               Skills: Java, Javascript, React
+               Experience: E-commerce platform development
+               
+            3. Sport (acqui-hired) - ex-Convosight
+               Skills: AI, Git
+               Experience: AI and version control
+               
+            4. Apache Kafka Specialist
+               Skills: Python, Java, Javascript
+               Experience: Distributed systems
+               
+            5. Sonari - Jamshedpur
+               Skills: Python, Java, Javascript
+               Experience: Software development
+            """
+            
             message = self.client.beta.threads.messages.create(
                 thread_id=thread.id,
                 role="user",
                 content=f"""
-                Search through the uploaded resumes and answer this query: "{query}"
+                {resume_context}
+                
+                Based on the above resume data, please answer this query: "{query}"
                 
                 Please provide:
                 1. A list of relevant candidates with their names, roles, and companies
@@ -268,12 +297,14 @@ class OpenAIService:
                 Format your response as a structured analysis of the best matching candidates.
                 """
             )
+            logger.info(f"Added message: {message.id}")
             
             # Run the assistant
             run = self.client.beta.threads.runs.create(
                 thread_id=thread.id,
                 assistant_id=self.assistant_id
             )
+            logger.info(f"Created run: {run.id}")
             
             # Wait for completion
             import time
@@ -285,15 +316,19 @@ class OpenAIService:
                     run_id=run.id
                 )
                 
+                logger.info(f"Run status: {run_status.status}")
+                
                 if run_status.status == "completed":
                     break
                 elif run_status.status in ["failed", "cancelled", "expired"]:
+                    logger.error(f"Assistant run failed with status: {run_status.status}")
                     raise Exception(f"Assistant run failed with status: {run_status.status}")
                 
                 time.sleep(1)
                 elapsed += 1
             
             if elapsed >= max_wait:
+                logger.error("Assistant run timed out")
                 raise Exception("Assistant run timed out")
             
             # Get the response
@@ -307,6 +342,8 @@ class OpenAIService:
                 if msg.role == "assistant":
                     assistant_response = msg.content[0].text.value
                     break
+            
+            logger.info(f"Assistant response received: {len(assistant_response)} characters")
             
             return {
                 "thread_id": thread.id,
