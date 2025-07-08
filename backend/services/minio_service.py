@@ -41,41 +41,48 @@ class MinIOService:
             # Don't raise the error to allow the application to start
             # The bucket check will be retried when needed
     
-    def upload_file(self, file_data: BinaryIO, filename: str, content_type: str = "application/octet-stream") -> str:
-        """Upload a file to MinIO and return the file path"""
-        if not self.available:
-            logger.error("MinIO service not available")
-            raise Exception("MinIO service not available")
-            
+    def upload_file(self, file_data, filename: str, content_type: str = None) -> str:
+        """Upload a file to MinIO"""
         try:
+            logger.info(f"📤 Starting file upload to MinIO: {filename}")
+            
             # Generate unique filename
-            file_extension = os.path.splitext(filename)[1]
-            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            file_extension = filename.split('.')[-1] if '.' in filename else ''
+            unique_filename = f"{uuid.uuid4()}.{file_extension}" if file_extension else str(uuid.uuid4())
+            
+            logger.info(f"🆔 Generated unique filename: {unique_filename}")
             
             # Upload file
+            logger.info(f"☁️ Uploading file to MinIO bucket: {self.bucket_name}")
             self.client.put_object(
                 self.bucket_name,
                 unique_filename,
                 file_data,
                 length=-1,
-                part_size=10*1024*1024,  # 10MB parts
-                content_type=content_type
+                part_size=10*1024*1024
             )
             
-            logger.info(f"Uploaded file: {filename} -> {unique_filename}")
+            logger.info(f"✅ File uploaded successfully: {filename} -> {unique_filename}")
             return unique_filename
             
-        except S3Error as e:
-            logger.error(f"Error uploading file {filename}: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error uploading file to MinIO: {e}")
             raise
     
-    def download_file(self, file_path: str) -> Optional[BinaryIO]:
+    def download_file(self, filename: str) -> Optional[BinaryIO]:
         """Download a file from MinIO"""
         try:
-            response = self.client.get_object(self.bucket_name, file_path)
+            logger.info(f"📥 Starting file download from MinIO: {filename}")
+            
+            # Get object
+            logger.info(f"🔍 Retrieving object from bucket: {self.bucket_name}")
+            response = self.client.get_object(self.bucket_name, filename)
+            
+            logger.info(f"✅ File downloaded successfully: {filename}")
             return response
-        except S3Error as e:
-            logger.error(f"Error downloading file {file_path}: {e}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error downloading file from MinIO: {e}")
             return None
     
     def delete_file(self, file_path: str) -> bool:

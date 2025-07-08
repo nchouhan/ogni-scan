@@ -1,0 +1,24 @@
+Supriya Sharma
+Software Engineer
+supriya.sharma@email.com
++91-9876543210
+
+EXPERIENCE
+Senior Software Engineer - TechCorp Inc.
+2020 - Present
+- Developed React applications
+- Worked with Python and Node.js
+- Implemented REST APIs
+
+Software Developer - StartupXYZ
+2018 - 2020
+- Built web applications using JavaScript
+- Worked with PostgreSQL and MongoDB
+
+SKILLS
+Python, JavaScript, React, Node.js, PostgreSQL, MongoDB, AWS, Docker, Git
+
+EDUCATION
+Bachelor of Technology in Computer Science
+Delhi University
+2014 - 2018
