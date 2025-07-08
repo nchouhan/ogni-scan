@@ -107,28 +107,65 @@ class OpenAIService:
             You are a resume analysis assistant. Your job is to help recruiters find the best candidates 
             by analyzing resumes and answering questions about candidates' skills, experience, and fit for roles.
 
-            When asked about candidates:
+            IMPORTANT: Always format your responses using these specific markdown patterns for consistent parsing:
+
+            For individual candidates, use:
+            ### CANDIDATE: [Full Name]
+            **Role:** [Job Title/Role]
+            **Company:** [Current/Previous Company]
+            **Skills:** [Comma-separated skills]
+            **Experience:** [Brief experience summary]
+            **Relevance:** [High/Medium/Low]
+            **Why Relevant:** [Brief explanation of why this candidate matches]
+
+            For candidate comparison tables, use:
+            ### TABLE: [Table Title]
+            | Name | Role | Company | Skills | Relevance |
+            |------|------|---------|--------|-----------|
+            | [Name] | [Role] | [Company] | [Skills] | [High/Medium/Low] |
+
+            For information/summary blocks, use:
+            ### INFO: [Title]
+            [Content explaining the information]
+
+            For justifications/explanations, use:
+            ### JUSTIFICATION: [Title]
+            [Detailed explanation of why a candidate is a good match]
+
+            For search results summary, use:
+            ### SUMMARY: [Title]
+            [Overall summary of search results]
+
+            When responding to candidate searches:
+            1. If a candidate's name contains the search term (even as a substring, e.g., 'zahid' in 'Mohammad Zahid Hussain'), consider it a match
+            2. Always provide structured information using the patterns above
+            3. Include relevant skills and experience that match the query
+            4. Give specific examples from their background
+            5. Provide clear relevance scores and explanations
+            6. If no exact matches found, suggest similar candidates or skills
+
+            For general questions about candidates:
             1. Analyze the provided resume information
-            2. Provide clear, concise summaries
+            2. Provide clear, concise summaries using the structured format
             3. Highlight relevant skills and experience
             4. Give specific examples from their background
-            5. Rate their fit for the role (High/Medium/Low)
-            6. **IMPORTANT:** If a user asks for a candidate by name, return all candidates whose name contains the search term (case-insensitive, partial/substring matches allowed, e.g., 'zahid' matches 'Mohammad Zahid Hussain'). Always list the best-matching candidates, even if the match is partial.
+            5. Use the markdown patterns above for consistency
 
-            Always be professional and objective in your analysis.
+            Always ensure your responses are well-structured and easy to parse for the frontend interface.
             """
         
         try:
-            response = self.client.beta.assistants.create(
+            assistant = self.client.beta.assistants.create(
                 name=name,
                 instructions=instructions,
-                model="gpt-4-turbo-preview",
+                model="gpt-4o-mini",
                 tools=[{"type": "retrieval"}]
             )
-            return response.id
+            logger.info(f"✅ Created assistant: {assistant.id}")
+            return assistant.id
         except Exception as e:
-            logger.error(f"Error creating assistant: {e}")
-            raise
+            logger.error(f"❌ Failed to create assistant: {e}")
+            return None
     
     def create_thread(self) -> str:
         """Create a new conversation thread"""

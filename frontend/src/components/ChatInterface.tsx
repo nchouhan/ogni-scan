@@ -11,6 +11,18 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import StarIcon from '@mui/icons-material/Star';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Paper from '@mui/material/Paper';
+import Alert from '@mui/material/Alert';
+import InfoIcon from '@mui/icons-material/Info';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string
@@ -24,94 +36,33 @@ interface ChatInterfaceProps {
   className?: string
 }
 
-// CandidateCard component for displaying candidate info in a card UI
+// Enhanced interfaces for structured markdown blocks
 interface Candidate {
   name: string;
   role?: string;
   company?: string;
-  whyRelevant?: string;
   skills?: string[];
   experience?: string;
   relevance?: string;
+  whyRelevant?: string;
   traits?: string[];
 }
 
-function CandidateCard({ candidate, highlight }: { candidate: Candidate, highlight?: boolean }) {
-  return (
-    <Card
-      elevation={highlight ? 8 : 2}
-      sx={{
-        maxWidth: 420,
-        mx: 'auto',
-        mb: 3,
-        borderRadius: 3,
-        border: highlight ? '2px solid #1976d2' : '1px solid #e0e0e0',
-        boxShadow: highlight ? 8 : 2,
-        transition: 'box-shadow 0.2s, border 0.2s',
-        position: 'relative',
-        background: highlight ? 'linear-gradient(90deg, #e3f2fd 0%, #fff 100%)' : undefined
-      }}
-      className={highlight ? 'animate-pulse' : ''}
-    >
-      <CardHeader
-        avatar={
-          <Avatar sx={{ bgcolor: highlight ? '#1976d2' : '#673ab7', width: 48, height: 48, fontSize: 24 }}>
-            {candidate.name.charAt(0)}
-          </Avatar>
-        }
-        title={<Typography variant="h6">{candidate.name}</Typography>}
-        subheader={
-          <>
-            <Typography variant="body2" color="text.secondary">
-              {candidate.role}{candidate.company ? ` @ ${candidate.company}` : ''}
-            </Typography>
-            {highlight && (
-              <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
-                <StarIcon fontSize="small" color="primary" />
-                <Typography variant="caption" color="primary.main" fontWeight={700}>Top Match</Typography>
-              </Box>
-            )}
-          </>
-        }
-        sx={{ pb: 0 }}
-      />
-      <CardContent sx={{ pt: 1 }}>
-        {candidate.whyRelevant && (
-          <Typography variant="body2" color="text.primary" mb={1}>{candidate.whyRelevant}</Typography>
-        )}
-        {candidate.skills && candidate.skills.length > 0 && (
-          <Box display="flex" flexWrap="wrap" gap={1} mb={1}>
-            {candidate.skills.map(skill => (
-              <Chip key={skill} label={skill} color="primary" variant="outlined" size="small" />
-            ))}
-          </Box>
-        )}
-        {candidate.traits && candidate.traits.length > 0 && (
-          <Box mb={1}>
-            <Typography variant="caption" color="text.secondary" fontWeight={700}>Notable Traits:</Typography>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {candidate.traits.map(trait => <li key={trait}><Typography variant="caption">{trait}</Typography></li>)}
-            </ul>
-          </Box>
-        )}
-        {candidate.experience && (
-          <Typography variant="caption" color="text.secondary">{candidate.experience}</Typography>
-        )}
-        {candidate.relevance && (
-          <Chip
-            label={`Relevance: ${candidate.relevance}`}
-            color={candidate.relevance.toLowerCase().includes('high') ? 'success' : candidate.relevance.toLowerCase().includes('medium') ? 'warning' : 'default'}
-            size="small"
-            sx={{ mt: 1, fontWeight: 700 }}
-          />
-        )}
-        <Box mt={2} display="flex" gap={1}>
-          <Button variant="contained" color="primary" size="small">View Resume</Button>
-          <Button variant="outlined" color="secondary" size="small">Shortlist</Button>
-        </Box>
-      </CardContent>
-    </Card>
-  );
+interface TableData {
+  title: string;
+  headers: string[];
+  rows: string[][];
+}
+
+interface InfoBlock {
+  title: string;
+  content: string;
+  type?: 'info' | 'success' | 'warning' | 'error';
+}
+
+interface MarkdownBlock {
+  type: 'candidate' | 'table' | 'info' | 'justification' | 'summary' | 'text';
+  data: Candidate | TableData | InfoBlock | string;
 }
 
 // Helper to parse candidate table markdown into objects
@@ -229,6 +180,386 @@ function extractCandidatesFromMessage(content: string): Candidate[] | null {
   return null;
 }
 
+
+
+// Parse structured markdown into blocks
+function parseStructuredMarkdown(content: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  
+  // Split by markdown headers
+  const sections = content.split(/^###\s+/m);
+  
+  sections.forEach(section => {
+    const trimmedSection = section.trim();
+    if (!trimmedSection) return;
+    
+    if (trimmedSection.startsWith('CANDIDATE:')) {
+      const candidate = parseCandidateBlock(trimmedSection);
+      if (candidate) {
+        blocks.push({ type: 'candidate', data: candidate });
+      }
+    } else if (trimmedSection.startsWith('TABLE:')) {
+      const table = parseTableBlock(trimmedSection);
+      if (table) {
+        blocks.push({ type: 'table', data: table });
+      }
+    } else if (trimmedSection.startsWith('INFO:')) {
+      const info = parseInfoBlock(trimmedSection);
+      if (info) {
+        blocks.push({ type: 'info', data: info });
+      }
+    } else if (trimmedSection.startsWith('JUSTIFICATION:')) {
+      const info = parseInfoBlock(trimmedSection);
+      if (info) {
+        blocks.push({ type: 'justification', data: info });
+      }
+    } else if (trimmedSection.startsWith('SUMMARY:')) {
+      const info = parseInfoBlock(trimmedSection);
+      if (info) {
+        blocks.push({ type: 'summary', data: info });
+      }
+    } else {
+      // Regular text content
+      blocks.push({ type: 'text', data: trimmedSection });
+    }
+  });
+  
+  return blocks;
+}
+
+// Parse candidate block
+function parseCandidateBlock(content: string): Candidate | null {
+  const lines = content.split('\n');
+  const candidate: Candidate = { name: '' };
+  
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('CANDIDATE:')) {
+      candidate.name = trimmed.replace('CANDIDATE:', '').trim();
+    } else if (trimmed.startsWith('**Role:**')) {
+      candidate.role = trimmed.replace('**Role:**', '').trim();
+    } else if (trimmed.startsWith('**Company:**')) {
+      candidate.company = trimmed.replace('**Company:**', '').trim();
+    } else if (trimmed.startsWith('**Skills:**')) {
+      const skills = trimmed.replace('**Skills:**', '').trim();
+      candidate.skills = skills.split(',').map(s => s.trim()).filter(s => s);
+    } else if (trimmed.startsWith('**Experience:**')) {
+      candidate.experience = trimmed.replace('**Experience:**', '').trim();
+    } else if (trimmed.startsWith('**Relevance:**')) {
+      candidate.relevance = trimmed.replace('**Relevance:**', '').trim();
+    } else if (trimmed.startsWith('**Why Relevant:**')) {
+      candidate.whyRelevant = trimmed.replace('**Why Relevant:**', '').trim();
+    }
+  });
+  
+  return candidate.name ? candidate : null;
+}
+
+// Parse table block
+function parseTableBlock(content: string): TableData | null {
+  const lines = content.split('\n');
+  const table: TableData = { title: '', headers: [], rows: [] };
+  
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('TABLE:')) {
+      table.title = trimmed.replace('TABLE:', '').trim();
+    } else if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const cells = trimmed.split('|').map(cell => cell.trim()).filter(cell => cell);
+      if (index === 1) { // Header row
+        table.headers = cells;
+      } else if (index > 2 && cells.length > 0) { // Data rows (skip separator)
+        table.rows.push(cells);
+      }
+    }
+  });
+  
+  return table.headers.length > 0 ? table : null;
+}
+
+// Parse info block
+function parseInfoBlock(content: string): InfoBlock | null {
+  const lines = content.split('\n');
+  const info: InfoBlock = { title: '', content: '' };
+  
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('INFO:') || trimmed.startsWith('JUSTIFICATION:') || trimmed.startsWith('SUMMARY:')) {
+      info.title = trimmed.replace(/^(INFO|JUSTIFICATION|SUMMARY):/, '').trim();
+    } else if (index > 0 && trimmed) {
+      info.content += (info.content ? '\n' : '') + trimmed;
+    }
+  });
+  
+  return info.title ? info : null;
+}
+
+// Enhanced Candidate Card Component
+function CandidateCard({ candidate, highlight }: { candidate: Candidate, highlight?: boolean }) {
+  const getRelevanceColor = (relevance?: string) => {
+    switch (relevance?.toLowerCase()) {
+      case 'high': return 'success';
+      case 'medium': return 'warning';
+      case 'low': return 'error';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <Card
+      elevation={highlight ? 8 : 2}
+      sx={{
+        maxWidth: 450,
+        mb: 2,
+        border: highlight ? '2px solid #1976d2' : '1px solid #e0e0e0',
+        backgroundColor: highlight ? '#f3f8ff' : 'white',
+        animation: highlight ? 'pulse 2s infinite' : 'none',
+        '@keyframes pulse': {
+          '0%': { boxShadow: '0 0 0 0 rgba(25, 118, 210, 0.7)' },
+          '70%': { boxShadow: '0 0 0 10px rgba(25, 118, 210, 0)' },
+          '100%': { boxShadow: '0 0 0 0 rgba(25, 118, 210, 0)' }
+        }
+      }}
+    >
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: highlight ? '#1976d2' : '#666' }}>
+            {candidate.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+          </Avatar>
+        }
+        title={
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography variant="h6">{candidate.name}</Typography>
+            {highlight && <StarIcon color="primary" />}
+          </Box>
+        }
+        subheader={
+          <Box>
+            {candidate.role && <Typography variant="body2" color="text.secondary">{candidate.role}</Typography>}
+            {candidate.company && <Typography variant="body2" color="text.secondary">{candidate.company}</Typography>}
+          </Box>
+        }
+        action={
+          candidate.relevance && (
+            <Chip
+              label={candidate.relevance}
+              color={getRelevanceColor(candidate.relevance) as any}
+              size="small"
+              variant="outlined"
+            />
+          )
+        }
+      />
+      <CardContent>
+        {candidate.skills && candidate.skills.length > 0 && (
+          <Box mb={2}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Skills:
+            </Typography>
+            <Box display="flex" flexWrap="wrap" gap={0.5}>
+              {candidate.skills.map((skill, index) => (
+                <Chip
+                  key={index}
+                  label={skill}
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
+        
+        {candidate.experience && (
+          <Box mb={2}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Experience:
+            </Typography>
+            <Typography variant="body2">{candidate.experience}</Typography>
+          </Box>
+        )}
+        
+        {candidate.whyRelevant && (
+          <Box mb={2}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Why Relevant:
+            </Typography>
+            <Typography variant="body2">{candidate.whyRelevant}</Typography>
+          </Box>
+        )}
+        
+        <Box display="flex" gap={1} mt={2}>
+          <Button variant="outlined" size="small" color="primary">
+            View Resume
+          </Button>
+          <Button variant="contained" size="small" color="primary">
+            Shortlist
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Table Component
+function DataTable({ table }: { table: TableData }) {
+  return (
+    <Box mb={3}>
+      <Typography variant="h6" gutterBottom>
+        {table.title}
+      </Typography>
+      <TableContainer component={Paper} elevation={2}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              {table.headers.map((header, index) => (
+                <TableCell key={index} sx={{ fontWeight: 'bold' }}>
+                  {header}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {table.rows.map((row, rowIndex) => (
+              <TableRow key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <TableCell key={cellIndex}>
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+}
+
+// Info Block Component
+function InfoBlock({ info, type }: { info: InfoBlock, type: string }) {
+  const getIcon = () => {
+    switch (type) {
+      case 'justification':
+        return <CheckCircleIcon />;
+      case 'summary':
+        return <InfoIcon />;
+      default:
+        return <InfoIcon />;
+    }
+  };
+
+  const getSeverity = () => {
+    switch (info.type) {
+      case 'success': return 'success';
+      case 'warning': return 'warning';
+      case 'error': return 'error';
+      default: return 'info';
+    }
+  };
+
+  return (
+    <Alert 
+      severity={getSeverity() as any}
+      icon={getIcon()}
+      sx={{ mb: 2 }}
+    >
+      <Typography variant="h6" gutterBottom>
+        {info.title}
+      </Typography>
+      <Typography variant="body2" component="div">
+        {info.content.split('\n').map((line, index) => (
+          <div key={index}>{line}</div>
+        ))}
+      </Typography>
+    </Alert>
+  );
+}
+
+// Render markdown blocks
+function renderMarkdownBlocks(blocks: MarkdownBlock[]) {
+  return blocks.map((block, index) => {
+    switch (block.type) {
+      case 'candidate':
+        return (
+          <CandidateCard 
+            key={index} 
+            candidate={block.data as Candidate}
+            highlight={index === 0} // Highlight first candidate
+          />
+        );
+      case 'table':
+        return <DataTable key={index} table={block.data as TableData} />;
+      case 'info':
+      case 'justification':
+      case 'summary':
+        // Render info/justification/summary as markdown
+        return (
+          <Box key={index} mb={2}>
+            <ReactMarkdown>{(block.data as InfoBlock).content}</ReactMarkdown>
+          </Box>
+        );
+      case 'text':
+        return (
+          <Box key={index} mb={2}>
+            <ReactMarkdown>{block.data as string}</ReactMarkdown>
+          </Box>
+        );
+      default:
+        return null;
+    }
+  });
+}
+
+// Update the message rendering logic
+function renderMessage(message: Message) {
+  if (message.type === 'assistant' && !message.isLoading) {
+    // Try to parse as structured markdown first
+    const blocks = parseStructuredMarkdown(message.content);
+    
+    if (blocks.length > 0) {
+      return (
+        <Box sx={{ p: 2 }}>
+          {renderMarkdownBlocks(blocks)}
+        </Box>
+      );
+    }
+    
+    // Fallback to existing candidate parsing for backward compatibility
+    const candidates = extractCandidatesFromMessage(message.content);
+    if (candidates && candidates.length > 0) {
+      return (
+        <Box sx={{ p: 2 }}>
+          {candidates.map((candidate, index) => (
+            <CandidateCard 
+              key={index} 
+              candidate={candidate}
+              highlight={index === 0}
+            />
+          ))}
+        </Box>
+      );
+    }
+  }
+  
+  // Default text rendering
+  return (
+    <Typography 
+      variant="body1" 
+      sx={{ 
+        p: 2, 
+        whiteSpace: 'pre-wrap',
+        backgroundColor: message.type === 'user' ? '#f5f5f5' : 'transparent',
+        borderRadius: 1
+      }}
+    >
+      {message.content}
+    </Typography>
+  );
+}
+
+
+
 export function ChatInterface({ className }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -341,21 +672,6 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background rounded-t-xl border border-muted shadow-inner">
         {messages.map((message) => {
-          if (message.type === 'assistant' && !message.isLoading) {
-            const candidates = extractCandidatesFromMessage(message.content);
-            if (candidates && candidates.length > 0) {
-              return (
-                <Box key={message.id} display="flex" flexDirection="column" alignItems="center" gap={2} width="100%">
-                  {candidates.map((candidate, idx) => (
-                    <CandidateCard key={candidate.name + idx} candidate={candidate} highlight={idx === 0} />
-                  ))}
-                  <Typography variant="caption" color="text.secondary" align="right" width="100%" maxWidth={420} mt={-1}>
-                    {formatDate(message.timestamp)}
-                  </Typography>
-                </Box>
-              );
-            }
-          }
           return (
             <div
               key={message.id}
@@ -369,28 +685,53 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                   <Bot className="w-5 h-5 text-primary-foreground" />
                 </div>
               )}
-              <div
-                className={cn(
-                  "max-w-[80%] rounded-xl px-4 py-2 shadow",
-                  message.type === 'user'
-                    ? 'bg-primary text-primary-foreground ml-12'
-                    : 'bg-card text-foreground mr-12 border border-muted'
-                )}
-              >
-                {message.isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Searching through resumes...</span>
+              {message.type === 'user' ? (
+                <Box
+                  sx={{
+                    maxWidth: '80%',
+                    background: '#fff',
+                    color: '#222',
+                    borderRadius: 3,
+                    border: '1.5px solid #1976d2',
+                    px: 3,
+                    py: 2,
+                    boxShadow: 2,
+                    ml: 6,
+                    fontSize: '1.2rem',
+                    fontWeight: 500,
+                    letterSpacing: 0.2,
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  <Typography variant="body1" sx={{ color: '#222', fontWeight: 500 }}>
+                    {message.content}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 1, textAlign: 'right' }}>
+                    {formatDate(message.timestamp)}
+                  </Typography>
+                </Box>
+              ) : (
+                <div
+                  className={cn(
+                    "max-w-[80%] rounded-xl px-4 py-2 shadow",
+                    'bg-card text-foreground mr-12 border border-muted'
+                  )}
+                >
+                  {message.isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Searching through resumes...</span>
+                    </div>
+                  ) : (
+                    renderMessage(message)
+                  )}
+                  <div className={cn(
+                    "text-xs mt-1 text-muted-foreground text-right"
+                  )}>
+                    {formatDate(message.timestamp)}
                   </div>
-                ) : (
-                  <div className="whitespace-pre-wrap">{message.content}</div>
-                )}
-                <div className={cn(
-                  "text-xs mt-1 text-muted-foreground text-right"
-                )}>
-                  {formatDate(message.timestamp)}
                 </div>
-              </div>
+              )}
               {message.type === 'user' && (
                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
                   <User className="w-5 h-5 text-secondary-foreground" />
@@ -409,7 +750,8 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask me about candidates: 'Find Supriya', 'Search Python developers', 'Who has React experience?'"
-            className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow"
+            className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow"
+            style={{ color: '#000', backgroundColor: '#fff' }}
             rows={1}
             disabled={isLoading}
           />
