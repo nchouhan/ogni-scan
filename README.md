@@ -36,19 +36,22 @@ A GPT-like intelligent assistant platform that allows recruiters to query and un
 - **OpenAI API** for embeddings and GPT-4
 - **Poetry** for dependency management
 
-### Frontend (Coming Soon)
+### Frontend
 - **React** with TypeScript
 - **Tailwind CSS** for styling
-- **shadcn/ui** for components
-- **Zustand** for state management
+- **Material-UI (MUI)** for components
 - **Vite** for build tooling
+- **Axios** for API communication
 
 ## 📋 Prerequisites
 
 - Docker and Docker Compose
 - Python 3.10+
+- Node.js 18+ (for frontend development)
 - Poetry (will be installed automatically)
 - OpenAI API key
+- MinIO (for file storage)
+- Redis (optional, for caching)
 
 ## 🚀 Quick Start
 
@@ -80,6 +83,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 ### 4. Access the Application
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
+- **Frontend**: http://localhost:5173 (after running `npm run dev` in frontend directory)
 - **MinIO Console**: http://localhost:9001
 - **Default Credentials**: admin/admin
 
@@ -167,25 +171,153 @@ curl -X POST "http://localhost:8000/api/v1/resumes/search" \
 
 ### Running Locally
 
-1. **Start Services**
+#### Prerequisites
+- Docker and Docker Compose
+- Python 3.10+
+- Node.js 18+ (for frontend)
+- OpenAI API key
+
+#### Backend Setup
+
+1. **Clone and Setup**
 ```bash
-docker-compose up -d
+git clone <repository-url>
+cd cogni-scan
 ```
 
-2. **Install Dependencies**
+2. **Create Environment File**
+```bash
+cp env.example .env
+# Edit .env and add your OpenAI API key
+```
+
+3. **Install Python Dependencies**
 ```bash
 poetry install
 ```
 
-3. **Run Migrations**
+4. **Start Required Services**
+```bash
+# Start PostgreSQL and Redis (MinIO should be running separately)
+docker-compose up -d postgres
+
+# Or start all services if you have MinIO running
+docker-compose up -d
+```
+
+5. **Run Database Migrations**
 ```bash
 poetry run alembic upgrade head
 ```
 
-4. **Start Development Server**
+6. **Start Backend Development Server**
 ```bash
-poetry run uvicorn backend.main:app --reload
+# From the project root directory
+poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+#### Frontend Setup
+
+1. **Navigate to Frontend Directory**
+```bash
+cd frontend
+```
+
+2. **Install Dependencies**
+```bash
+npm install
+```
+
+3. **Start Development Server**
+```bash
+npm run dev
+```
+
+4. **Access Frontend**
+- Frontend will be available at: http://localhost:5173 (or next available port)
+
+#### External Services Setup
+
+**MinIO Setup (Required for file uploads)**
+```bash
+# Start MinIO using Docker
+docker run -d \
+  --name minio \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -e "MINIO_ROOT_USER=minioadmin" \
+  -e "MINIO_ROOT_PASSWORD=minioadmin" \
+  minio/minio server /data --console-address ":9001"
+
+# Create the required bucket
+docker exec minio mc mb minio/cogni-resumes --ignore-existing
+```
+
+**Redis Setup (Optional, for caching)**
+```bash
+# Start Redis using Docker
+docker run -d --name redis -p 6379:6379 redis:alpine
+```
+
+#### Complete Setup Script
+
+Alternatively, use the provided setup script:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+**Note**: The setup script assumes you have MinIO and Redis running externally. If not, start them manually as shown above.
+
+### Troubleshooting
+
+#### Common Issues
+
+**1. Backend Import Error: "No module named 'backend'"**
+```bash
+# Make sure you're running from the project root directory
+cd /path/to/cogni-scan
+poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**2. MinIO Connection Issues**
+```bash
+# Check if MinIO is running
+docker ps | grep minio
+
+# If not running, start it:
+docker run -d --name minio -p 9000:9000 -p 9001:9001 \
+  -e "MINIO_ROOT_USER=minioadmin" \
+  -e "MINIO_ROOT_PASSWORD=minioadmin" \
+  minio/minio server /data --console-address ":9001"
+```
+
+**3. Database Connection Issues**
+```bash
+# Check if PostgreSQL is running
+docker ps | grep postgres
+
+# If not running, start it:
+docker-compose up -d postgres
+```
+
+**4. Frontend Port Already in Use**
+```bash
+# The frontend will automatically try the next available port
+# Check the terminal output for the correct URL
+```
+
+**5. OpenAI API Key Issues**
+- Make sure your OpenAI API key is set in the `.env` file
+- Verify the key is valid and has sufficient credits
+- Check the backend logs for API errors
+
+#### Service URLs and Ports
+- **Backend**: http://localhost:8000
+- **Frontend**: http://localhost:5173 (or next available port)
+- **PostgreSQL**: localhost:5442
+- **MinIO**: http://localhost:9000 (API), http://localhost:9001 (Console)
+- **Redis**: localhost:6379
 
 ### Database Migrations
 
@@ -240,7 +372,13 @@ cogni-scan/
 │   ├── schemas/             # Pydantic schemas
 │   ├── services/            # Business logic
 │   └── main.py              # FastAPI app
-├── frontend/                # React frontend (coming soon)
+├── frontend/                # React frontend
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── lib/            # Utilities and API
+│   │   └── App.tsx         # Main app component
+│   ├── package.json        # Frontend dependencies
+│   └── vite.config.ts      # Vite configuration
 ├── alembic/                 # Database migrations
 ├── docker-compose.yml       # Docker services
 ├── Dockerfile               # Backend container

@@ -131,6 +131,7 @@ function App() {
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
+            <img src="/vite.svg" alt="CogniScan Logo" className="h-8 w-8 mr-2" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
               CogniScan
             </h1>

@@ -550,7 +550,11 @@ function renderMessage(message: Message) {
         p: 2, 
         whiteSpace: 'pre-wrap',
         backgroundColor: message.type === 'user' ? '#f5f5f5' : 'transparent',
-        borderRadius: 1
+        borderRadius: 1,
+        fontWeight: 400,
+        fontSize: '0.95rem',
+        lineHeight: 1.5,
+        color: '#333'
       }}
     >
       {message.content}
@@ -690,32 +694,37 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                   sx={{
                     maxWidth: '80%',
                     background: '#fff',
-                    color: '#222',
+                    color: '#333',
                     borderRadius: 3,
-                    border: '1.5px solid #1976d2',
+                    border: '1px solid #1976d2',
                     px: 3,
                     py: 2,
-                    boxShadow: 2,
+                    boxShadow: 1,
                     ml: 6,
-                    fontSize: '1.2rem',
-                    fontWeight: 500,
-                    letterSpacing: 0.2,
+                    fontSize: '1rem',
+                    fontWeight: 400,
+                    letterSpacing: 0.1,
                     wordBreak: 'break-word',
                   }}
                 >
-                  <Typography variant="body1" sx={{ color: '#222', fontWeight: 500 }}>
+                  <Typography variant="body1" sx={{ color: '#333', fontWeight: 400 }}>
                     {message.content}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 1, textAlign: 'right' }}>
+                  <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 1, textAlign: 'right', fontWeight: 300, fontSize: '0.75rem' }}>
                     {formatDate(message.timestamp)}
                   </Typography>
                 </Box>
               ) : (
                 <div
                   className={cn(
-                    "max-w-[80%] rounded-xl px-4 py-2 shadow",
+                    "max-w-[80%] rounded-xl px-4 py-2 shadow-sm",
                     'bg-card text-foreground mr-12 border border-muted'
                   )}
+                  style={{
+                    fontSize: '0.95rem',
+                    fontWeight: 400,
+                    lineHeight: 1.5
+                  }}
                 >
                   {message.isLoading ? (
                     <div className="flex items-center gap-2">
@@ -727,7 +736,11 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                   )}
                   <div className={cn(
                     "text-xs mt-1 text-muted-foreground text-right"
-                  )}>
+                  )}
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 300
+                  }}>
                     {formatDate(message.timestamp)}
                   </div>
                 </div>
@@ -751,7 +764,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             onKeyPress={handleKeyPress}
             placeholder="Ask me about candidates: 'Find Supriya', 'Search Python developers', 'Who has React experience?'"
             className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow"
-            style={{ color: '#000', backgroundColor: '#fff' }}
+            style={{ color: '#000', backgroundColor: '#fff', fontWeight: 400, fontSize: '0.95rem' }}
             rows={1}
             disabled={isLoading}
           />
@@ -763,7 +776,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             <Send className="w-4 h-4" />
           </button>
         </div>
-        <div className="text-xs text-muted-foreground mt-1 text-right">
+        <div className="text-xs text-muted-foreground mt-1 text-right" style={{ fontWeight: 300 }}>
           Press Enter to send, Shift+Enter for new line
         </div>
       </div>
